@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { modules, levels, questions, PAPER_VERSION } from './questions.mjs'
 import { createAttempt, finishAttempt, readState, score, storageKey } from './assessment.mjs'
+import { modulesEn, levelsEn, questionsEn } from './i18n.mjs'
 
 test('固定试卷每层按模块排列，每模块每层两道四选一题', () => {
   assert.equal(questions.length, 36)
@@ -49,4 +50,18 @@ test('交卷保留题卷和答案快照，重复提交只产生一份报告', ()
   assert.equal(repeated.history[1].results[0].points, 1)
   const stored = new Map([[storageKey, JSON.stringify(repeated)]])
   assert.deepEqual(readState({ getItem: key => stored.get(key) ?? null }), repeated)
+})
+
+test('中英文翻译覆盖全部模块、层级和 36 道题', () => {
+  for (const mod of modules) {
+    assert.ok(modulesEn[mod.id]?.name && modulesEn[mod.id]?.topics, mod.id)
+  }
+  for (const level of levels) {
+    assert.ok(levelsEn[level.id]?.name && levelsEn[level.id]?.short, level.id)
+  }
+  for (const item of questions) {
+    const en = questionsEn[item.id]
+    assert.ok(en?.topic && en?.prompt && en?.explanation, item.id)
+    assert.equal(new Set(en.options).size, 4, item.id)
+  }
 })

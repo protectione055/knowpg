@@ -12,6 +12,8 @@
         const saved = localStorage.getItem('pg-kernel-assessment.theme')
         const dark = saved === 'dark' || (saved !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+        const lang = localStorage.getItem('pg-kernel-assessment.lang')
+        if (lang === 'en') document.documentElement.lang = 'en'
       } catch {}
     })()
   </script>
@@ -38,10 +40,13 @@
           <a href="#home" data-nav="home">首页</a>
           <a href="#history" data-nav="history">历史报告</a>
         </nav>
-        <button type="button" class="theme-toggle" id="theme-toggle" aria-label="切换浅色/深色主题" title="切换浅色/深色主题">
-          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        </button>
+        <div class="header-controls">
+          <button type="button" class="icon-btn lang-toggle" id="lang-toggle" aria-label="Switch to English" title="Switch to English">EN</button>
+          <button type="button" class="icon-btn theme-toggle" id="theme-toggle" aria-label="切换浅色/深色主题" title="切换浅色/深色主题">
+            <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -49,15 +54,15 @@
   <footer class="site-footer">
     <div class="shell footer-inner">
       <span>PostgreSQL 18.6</span>
-      <span>数据仅存于当前浏览器</span>
+      <span id="footer-right">数据仅存于当前浏览器</span>
     </div>
   </footer>
   <dialog id="confirmation" aria-labelledby="confirm-title">
     <h2 id="confirm-title">确认交卷</h2>
     <p id="confirm-copy"></p>
     <form method="dialog" class="dialog-actions">
-      <button class="button button-secondary" value="cancel" autofocus>返回检查</button>
-      <button class="button button-primary" value="submit">确认交卷</button>
+      <button class="button button-secondary" id="confirm-cancel" value="cancel" autofocus>返回检查</button>
+      <button class="button button-primary" id="confirm-submit" value="submit">确认交卷</button>
     </form>
   </dialog>
 </body>

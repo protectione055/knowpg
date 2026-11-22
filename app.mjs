@@ -1,21 +1,65 @@
 import { PG_VERSION, modules, levels, questions } from './questions.mjs'
 import { createAttempt, finishAttempt, readState, storageKey } from './assessment.mjs'
+import { ui, modulesEn, levelsEn, questionsEn } from './i18n.mjs'
 
 const main = document.querySelector('main')
 const confirmation = document.querySelector('#confirmation')
 const themeToggle = document.querySelector('#theme-toggle')
+const langToggle = document.querySelector('#lang-toggle')
 const themeStorageKey = 'pg-kernel-assessment.theme'
-const dateFormat = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' })
+const langStorageKey = 'pg-kernel-assessment.lang'
 const letters = ['A', 'B', 'C', 'D']
 
+const dateFormats = {
+  zh: new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }),
+  en: new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+}
+
+let lang = (() => {
+  try {
+    return localStorage.getItem(langStorageKey) === 'en' ? 'en' : 'zh'
+  } catch {
+    return 'zh'
+  }
+})()
+
 let state
-let storageError = ''
+let storageErrorKey = ''
 let activeModuleId = modules[0].id
 let reviewFilter = 'all'
 let statusFilter = 'all'
 let allExpanded = false
 let submissionId
 let previousRoute
+
+const t = () => ui[lang]
+
+function locModule(mod) {
+  if (lang === 'en' && modulesEn[mod.id])
+    return { ...mod, ...modulesEn[mod.id] }
+  return { ...mod, shortName: mod.name }
+}
+
+function locLevel(level) {
+  if (lang === 'en' && levelsEn[level.id])
+    return { ...level, ...levelsEn[level.id] }
+  return { ...level, short: level.name.slice(0, 2) }
+}
+
+function locQuestion(item) {
+  if (lang === 'en' && questionsEn[item.id]) {
+    const en = questionsEn[item.id]
+    return {
+      ...item,
+      topic: en.topic,
+      prompt: en.prompt,
+      options: en.options,
+      explanation: en.explanation,
+      source: en.sourceLabel ? { ...item.source, label: en.sourceLabel } : item.source,
+    }
+  }
+  return item
+}
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, character => ({
@@ -30,6 +74,31 @@ function syncThemeColor() {
     meta.setAttribute('content', isDark ? '#0f1318' : '#faf8f5')
 }
 
+function syncChrome() {
+  const dict = t()
+  document.documentElement.lang = lang === 'en' ? 'en' : 'zh-CN'
+  document.title = dict.docTitle
+  const skip = document.querySelector('.skip-link')
+  if (skip) skip.textContent = dict.skipLink
+  if (themeToggle) {
+    themeToggle.setAttribute('aria-label', dict.themeToggle)
+    themeToggle.title = dict.themeToggle
+  }
+  if (langToggle) {
+    langToggle.textContent = dict.langButton
+    langToggle.setAttribute('aria-label', dict.langToggle)
+    langToggle.title = dict.langToggle
+  }
+  const footerRight = document.querySelector('#footer-right')
+  if (footerRight) footerRight.textContent = dict.footerRight
+  const confirmTitle = document.querySelector('#confirm-title')
+  if (confirmTitle) confirmTitle.textContent = dict.confirmTitle
+  const confirmCancel = document.querySelector('#confirm-cancel')
+  if (confirmCancel) confirmCancel.textContent = dict.confirmCancel
+  const confirmSubmit = document.querySelector('#confirm-submit')
+  if (confirmSubmit) confirmSubmit.textContent = dict.confirmSubmit
+}
+
 themeToggle?.addEventListener('click', () => {
   const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
   document.documentElement.dataset.theme = next
@@ -40,13 +109,22 @@ themeToggle?.addEventListener('click', () => {
 })
 syncThemeColor()
 
+langToggle?.addEventListener('click', () => {
+  lang = lang === 'zh' ? 'en' : 'zh'
+  try {
+    localStorage.setItem(langStorageKey, lang)
+  } catch {}
+  syncChrome()
+  render()
+})
+
 function refreshState() {
   try {
     state = readState(localStorage)
-    storageError = ''
+    storageErrorKey = ''
   } catch {
     state ??= { active: null, history: [] }
-    storageError = '无法读取本地存储中的作答记录，请检查浏览器是否禁用了本站的 localStorage 权限。'
+    storageErrorKey = 'storageReadError'
   }
 }
 
@@ -57,7 +135,7 @@ async function changeState(update) {
     if (next !== current)
       localStorage.setItem(storageKey, JSON.stringify(next))
     state = next
-    storageError = ''
+    storageErrorKey = ''
   }
 
   try {
@@ -67,7 +145,7 @@ async function changeState(update) {
       save()
     return true
   } catch {
-    storageError = '保存进度失败，请检查浏览器的本地存储空间或权限后重试。'
+    storageErrorKey = 'storageWriteError'
     render()
     return false
   }
@@ -95,20 +173,29 @@ function summarizeReport(report) {
 }
 
 function renderInspector(moduleId) {
-  const mod = modules.find(item => item.id === moduleId) || modules[0]
+  const mod = locModule(modules.find(item => item.id === moduleId) || modules[0])
   return `
     <div class="inspector-main">
       <strong>${escapeHtml(mod.name)}</strong>
       <p class="inspector-topics">${escapeHtml(mod.topics)}</p>
     </div>
-    <span class="inspector-meta">6 题</span>`
+    <span class="inspector-meta">${t().moduleCount(6)}</span>`
 }
 
 function kernelDiagram() {
+  const dict = t()
   const is = id => (activeModuleId === id ? 'is-active' : '')
+  const m = id => locModule(modules.find(item => item.id === id))
+  const planner = m('planner')
+  const executor = m('executor')
+  const indexMod = m('index')
+  const storage = m('storage')
+  const tx = m('transaction')
+  const wal = m('wal')
+
   return `
-    <figure class="kernel-stage" aria-label="PostgreSQL 内核模块架构图">
-      <svg class="kernel-svg" viewBox="0 0 640 422" role="img" aria-label="PostgreSQL 查询规划、查询执行、索引、堆表与缓冲、事务并发和 WAL 恢复架构图">
+    <figure class="kernel-stage" aria-label="${escapeHtml(dict.diagramAria)}">
+      <svg class="kernel-svg" viewBox="0 0 640 422" role="img" aria-label="${escapeHtml(dict.diagramAria)}">
         <defs>
           <marker id="pg-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
             <path d="M 1 2 L 8 5 L 1 8 z" fill="var(--line-strong)"/>
@@ -117,13 +204,13 @@ function kernelDiagram() {
 
         <!-- Layer 1: Query Processing -->
         <rect class="arch-layer-bg" x="14" y="12" width="612" height="118" rx="8"/>
-        <text class="arch-layer-label" x="26" y="29">查询处理</text>
+        <text class="arch-layer-label" x="26" y="29">${escapeHtml(dict.layerQuery)}</text>
 
         <rect class="arch-sql-box" x="26" y="61" width="52" height="32" rx="5"/>
         <text class="arch-sql-text" x="52" y="81" text-anchor="middle">SQL</text>
         <path class="arch-flow" d="M 78 77 L 104 77" marker-end="url(#pg-arrow)"/>
 
-        <g class="arch-node ${is('planner')}" data-module="planner" tabindex="0" role="button" aria-label="查询规划">
+        <g class="arch-node ${is('planner')}" data-module="planner" tabindex="0" role="button" aria-label="${escapeHtml(planner.name)}">
           <rect class="arch-node-depth" x="108" y="46" width="218" height="72" rx="7"/>
           <rect class="arch-node-face" x="108" y="42" width="218" height="72" rx="7"/>
           <circle class="arch-glyph-fill" cx="136" cy="60" r="6"/>
@@ -132,7 +219,7 @@ function kernelDiagram() {
           <line class="arch-glyph" x1="139" y1="65" x2="148" y2="79"/>
           <rect class="arch-glyph" x="118" y="80" width="12" height="9" rx="2"/>
           <rect class="arch-glyph" x="142" y="80" width="12" height="9" rx="2"/>
-          <text class="arch-node-title" x="166" y="71">查询规划</text>
+          <text class="arch-node-title" x="166" y="71">${escapeHtml(planner.shortName)}</text>
           <text class="arch-node-sub" x="166" y="89">Planner</text>
           <circle class="arch-pin-halo" cx="316" cy="52" r="10"/>
           <circle class="arch-pin-ring" cx="316" cy="52" r="5.5"/>
@@ -142,14 +229,14 @@ function kernelDiagram() {
         <path class="arch-flow" d="M 326 77 L 368 77" marker-end="url(#pg-arrow)"/>
         <text class="arch-flow-label" x="347" y="70" text-anchor="middle">Plan</text>
 
-        <g class="arch-node ${is('executor')}" data-module="executor" tabindex="0" role="button" aria-label="查询执行">
+        <g class="arch-node ${is('executor')}" data-module="executor" tabindex="0" role="button" aria-label="${escapeHtml(executor.name)}">
           <rect class="arch-node-depth" x="372" y="46" width="240" height="72" rx="7"/>
           <rect class="arch-node-face" x="372" y="42" width="240" height="72" rx="7"/>
           <rect class="arch-glyph-box" x="386" y="54" width="32" height="10" rx="2"/>
           <rect class="arch-glyph-box" x="386" y="69" width="32" height="10" rx="2"/>
           <rect class="arch-glyph-box" x="386" y="84" width="32" height="10" rx="2"/>
           <path class="arch-glyph" d="M 424 90 L 424 58 M 421 62 L 424 58 L 427 62"/>
-          <text class="arch-node-title" x="438" y="71">查询执行</text>
+          <text class="arch-node-title" x="438" y="71">${escapeHtml(executor.shortName)}</text>
           <text class="arch-node-sub" x="438" y="89">Executor</text>
           <circle class="arch-pin-halo" cx="602" cy="52" r="10"/>
           <circle class="arch-pin-ring" cx="602" cy="52" r="5.5"/>
@@ -164,12 +251,12 @@ function kernelDiagram() {
 
         <!-- Layer 2: Shared Memory & Concurrency -->
         <rect class="arch-layer-bg" x="14" y="148" width="612" height="136" rx="8"/>
-        <text class="arch-layer-label" x="26" y="165">内存与并发</text>
+        <text class="arch-layer-label" x="26" y="165">${escapeHtml(dict.layerMemory)}</text>
 
-        <g class="arch-node ${is('index')}" data-module="index" tabindex="0" role="button" aria-label="索引">
+        <g class="arch-node ${is('index')}" data-module="index" tabindex="0" role="button" aria-label="${escapeHtml(indexMod.name)}">
           <rect class="arch-node-depth" x="26" y="178" width="182" height="94" rx="7"/>
           <rect class="arch-node-face" x="26" y="174" width="182" height="94" rx="7"/>
-          <text class="arch-node-title" x="40" y="199">索引</text>
+          <text class="arch-node-title" x="40" y="199">${escapeHtml(indexMod.shortName)}</text>
           <text class="arch-node-sub" x="40" y="216">B-tree &amp; VM</text>
           <rect class="arch-glyph-box" x="40" y="229" width="44" height="14" rx="2"/>
           <rect class="arch-glyph-box" x="92" y="229" width="44" height="14" rx="2"/>
@@ -184,10 +271,10 @@ function kernelDiagram() {
           <circle class="arch-pin-dot" cx="198" cy="184" r="2.2"/>
         </g>
 
-        <g class="arch-node ${is('storage')}" data-module="storage" tabindex="0" role="button" aria-label="堆表与缓冲管理">
+        <g class="arch-node ${is('storage')}" data-module="storage" tabindex="0" role="button" aria-label="${escapeHtml(storage.name)}">
           <rect class="arch-node-depth" x="224" y="178" width="194" height="94" rx="7"/>
           <rect class="arch-node-face" x="224" y="174" width="194" height="94" rx="7"/>
-          <text class="arch-node-title" x="238" y="199">堆表与缓冲</text>
+          <text class="arch-node-title" x="238" y="199">${escapeHtml(lang === 'zh' ? '堆表与缓冲' : storage.shortName)}</text>
           <text class="arch-node-sub" x="238" y="216">Heap &amp; Buffers</text>
           <rect class="arch-glyph-box" x="238" y="229" width="164" height="24" rx="3"/>
           <rect class="arch-glyph-fill" x="239" y="230" width="44" height="22" rx="2"/>
@@ -200,10 +287,10 @@ function kernelDiagram() {
           <circle class="arch-pin-dot" cx="408" cy="184" r="2.2"/>
         </g>
 
-        <g class="arch-node ${is('transaction')}" data-module="transaction" tabindex="0" role="button" aria-label="事务与并发">
+        <g class="arch-node ${is('transaction')}" data-module="transaction" tabindex="0" role="button" aria-label="${escapeHtml(tx.name)}">
           <rect class="arch-node-depth" x="434" y="178" width="178" height="94" rx="7"/>
           <rect class="arch-node-face" x="434" y="174" width="178" height="94" rx="7"/>
-          <text class="arch-node-title" x="448" y="199">事务与并发</text>
+          <text class="arch-node-title" x="448" y="199">${escapeHtml(tx.shortName)}</text>
           <text class="arch-node-sub" x="448" y="216">MVCC &amp; Locks</text>
           <line class="arch-glyph" x1="448" y1="241" x2="594" y2="241"/>
           <circle class="arch-glyph-fill" cx="482" cy="241" r="4"/>
@@ -226,12 +313,12 @@ function kernelDiagram() {
 
         <!-- Layer 3: Persistence & Recovery -->
         <rect class="arch-layer-bg" x="14" y="302" width="612" height="108" rx="8"/>
-        <text class="arch-layer-label" x="26" y="319">日志与恢复</text>
+        <text class="arch-layer-label" x="26" y="319">${escapeHtml(dict.layerWal)}</text>
 
-        <g class="arch-node ${is('wal')}" data-module="wal" tabindex="0" role="button" aria-label="WAL 与恢复">
+        <g class="arch-node ${is('wal')}" data-module="wal" tabindex="0" role="button" aria-label="${escapeHtml(wal.name)}">
           <rect class="arch-node-depth" x="26" y="330" width="586" height="68" rx="7"/>
           <rect class="arch-node-face" x="26" y="326" width="586" height="68" rx="7"/>
-          <text class="arch-node-title" x="42" y="355">WAL 与恢复</text>
+          <text class="arch-node-title" x="42" y="355">${escapeHtml(wal.shortName)}</text>
           <text class="arch-node-sub" x="42" y="374">Write-Ahead Log</text>
           <rect class="arch-glyph-box" x="234" y="344" width="76" height="30" rx="4"/>
           <text class="arch-glyph-text" x="272" y="362" text-anchor="middle">FPI</text>
@@ -254,11 +341,14 @@ function kernelDiagram() {
         ${renderInspector(activeModuleId)}
       </div>
 
-      <div class="stage-pills" role="group" aria-label="选择内核模块">
-        ${modules.map(mod => `
+      <div class="stage-pills" role="group" aria-label="${escapeHtml(dict.diagramPillsAria)}">
+        ${modules.map(raw => {
+          const mod = locModule(raw)
+          return `
           <button type="button" class="stage-pill" data-module="${mod.id}" aria-pressed="${activeModuleId === mod.id}">
-            <i aria-hidden="true"></i>${escapeHtml(mod.name)}
-          </button>`).join('')}
+            <i aria-hidden="true"></i>${escapeHtml(mod.shortName)}
+          </button>`
+        }).join('')}
       </div>
     </figure>`
 }
@@ -279,9 +369,10 @@ function updateActiveModule(moduleId) {
 }
 
 function home() {
+  const dict = t()
   const answeredCount = state.active ? Object.keys(state.active.answers).length : 0
   const resume = state.active
-    ? `<span class="resume-note">已答 ${answeredCount} / ${questions.length}</span>`
+    ? `<span class="resume-note">${escapeHtml(dict.resumeCount(answeredCount, questions.length))}</span>`
     : ''
 
   return `
@@ -289,13 +380,13 @@ function home() {
       <div class="hero-band">
         <div class="hero-copy">
           <h1 id="home-title" lang="en">How Well Do You Know<br><span>PostgreSQL?</span></h1>
-          <p class="hero-lead">面向 PostgreSQL ${PG_VERSION} 的内核测试，从基础概念、运行机制一直考到源码实现。</p>
+          <p class="hero-lead">${escapeHtml(dict.heroLead(PG_VERSION))}</p>
           <div class="hero-actions">
-            <button class="button button-primary" data-action="start">${state.active ? '继续答题' : '开始答题'} →</button>
-            ${state.history.length ? `<a class="button button-secondary" href="#history">历史报告</a>` : ''}
+            <button class="button button-primary" data-action="start">${escapeHtml(state.active ? dict.resumeQuiz : dict.startQuiz)} →</button>
+            ${state.history.length ? `<a class="button button-secondary" href="#history">${escapeHtml(dict.navHistory)}</a>` : ''}
             ${resume}
           </div>
-          <p class="hero-meta">${modules.length} 个模块 · ${questions.length} 题 · 约 45 分钟</p>
+          <p class="hero-meta">${escapeHtml(dict.heroMeta(modules.length, questions.length))}</p>
         </div>
         ${kernelDiagram()}
       </div>
@@ -303,26 +394,27 @@ function home() {
 }
 
 function quiz() {
+  const dict = t()
   const { position, answers } = state.active
-  const item = questions[position]
-  const module = modules.find(candidate => candidate.id === item.module)
-  const level = levels.find(candidate => candidate.id === item.level)
+  const item = locQuestion(questions[position])
+  const module = locModule(modules.find(candidate => candidate.id === item.module))
+  const level = locLevel(levels.find(candidate => candidate.id === item.level))
   const count = Object.keys(answers).length
   return `
     <section class="quiz-page" aria-labelledby="quiz-title">
       <div class="page-top">
-        <a class="text-link" href="#home">← 首页</a>
-        <span class="progress-count" aria-live="polite">已答 ${count} / ${questions.length}</span>
+        <a class="text-link" href="#home">${escapeHtml(dict.backHome)}</a>
+        <span class="progress-count" aria-live="polite">${escapeHtml(dict.answeredProgress(count, questions.length))}</span>
       </div>
       <div class="quiz-progress">
-        <progress aria-label="已答题数" value="${count}" max="${questions.length}"></progress>
+        <progress aria-label="${escapeHtml(dict.progressAria)}" value="${count}" max="${questions.length}"></progress>
       </div>
       <div class="quiz-layout">
         <article class="question-panel">
           <div class="question-meta">
-            <strong>第 ${position + 1} / ${questions.length} 题</strong>
+            <strong>${escapeHtml(dict.questionOf(position + 1, questions.length))}</strong>
             <span>${escapeHtml(module.name)}</span>
-            <span class="tier-tag tier-${level.id}">${escapeHtml(level.name)} · ${level.points} 分</span>
+            <span class="tier-tag tier-${level.id}">${escapeHtml(level.name)} · ${escapeHtml(dict.pointsUnit(level.points))}</span>
           </div>
           <h1 id="quiz-title" data-focus tabindex="-1">${escapeHtml(item.prompt)}</h1>
           ${item.code ? `<pre><code>${escapeHtml(item.code)}</code></pre>` : ''}
@@ -335,54 +427,60 @@ function quiz() {
               </label>`).join('')}
           </fieldset>
           <div class="quiz-actions">
-            <button class="button button-secondary" data-position="${position - 1}" ${position === 0 ? 'disabled' : ''}>← 上一题</button>
+            <button class="button button-secondary" data-position="${position - 1}" ${position === 0 ? 'disabled' : ''}>${escapeHtml(dict.prevQuestion)}</button>
             ${position < questions.length - 1
-              ? `<button class="button button-primary" data-position="${position + 1}">下一题 →</button>`
-              : '<button class="button button-primary" data-action="confirm">提交试卷</button>'}
+              ? `<button class="button button-primary" data-position="${position + 1}">${escapeHtml(dict.nextQuestion)}</button>`
+              : `<button class="button button-primary" data-action="confirm">${escapeHtml(dict.submitPaper)}</button>`}
           </div>
         </article>
-        <aside class="question-map" aria-label="题号导航">
-          <h2>答题卡</h2>
-          ${levels.map(group => `<div class="map-group"><p>${escapeHtml(group.name)}（${group.points} 分）</p><div class="number-grid">
+        <aside class="question-map" aria-label="${escapeHtml(dict.answerSheetAria)}">
+          <h2>${escapeHtml(dict.answerSheet)}</h2>
+          ${levels.map(rawGroup => {
+            const group = locLevel(rawGroup)
+            return `<div class="map-group"><p>${escapeHtml(group.name)} (${escapeHtml(dict.pointsUnit(group.points))})</p><div class="number-grid">
             ${questions.map((question, index) => question.level === group.id ? `<button
               type="button" data-position="${index}"
-              aria-label="第 ${index + 1} 题，${Object.hasOwn(answers, question.id) ? '已答' : '未答'}"
+              aria-label="${escapeHtml(dict.mapItemAria(index + 1, Object.hasOwn(answers, question.id)))}"
               ${index === position ? 'aria-current="step"' : ''}
               class="${Object.hasOwn(answers, question.id) ? 'answered' : ''}">${index + 1}</button>` : '').join('')}
-          </div></div>`).join('')}
-          <div class="map-footer"><button class="button button-secondary" data-action="confirm">提交试卷</button></div>
+          </div></div>`
+          }).join('')}
+          <div class="map-footer"><button class="button button-secondary" data-action="confirm">${escapeHtml(dict.submitPaper)}</button></div>
         </aside>
       </div>
     </section>`
 }
 
 function history() {
+  const dict = t()
   const ordered = [...state.history].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt))
   return `
     <section class="inner-page" aria-labelledby="history-title">
-      <div class="page-top"><a class="text-link" href="#home">← 首页</a></div>
-      <h1 id="history-title" data-focus tabindex="-1">历史报告</h1>
+      <div class="page-top"><a class="text-link" href="#home">${escapeHtml(dict.backHome)}</a></div>
+      <h1 id="history-title" data-focus tabindex="-1">${escapeHtml(dict.historyTitle)}</h1>
       ${ordered.length ? `<ul class="history-list">${ordered.map(item => {
         const summary = summarizeReport(item)
         return `<li><a href="#report/${escapeHtml(item.id)}">
           <div class="history-meta">
-            <strong>${dateFormat.format(new Date(item.submittedAt))}</strong>
+            <strong>${dateFormats[lang].format(new Date(item.submittedAt))}</strong>
           </div>
           <div class="history-score">
             <b>${summary.percent}%</b>
-            <span>${summary.points}/${summary.max} 分 · 对 ${summary.correctCount}/${summary.total}</span>
-            <span class="history-link">查看 →</span>
+            <span>${escapeHtml(dict.historyDetail(summary.points, summary.max, summary.correctCount, summary.total))}</span>
+            <span class="history-link">${escapeHtml(dict.viewReport)}</span>
           </div>
         </a></li>`
-      }).join('')}</ul>` : '<div class="empty"><p>还没有交卷记录。</p><a class="button button-primary" href="#home">开始答题</a></div>'}
+      }).join('')}</ul>` : `<div class="empty"><p>${escapeHtml(dict.historyEmpty)}</p><a class="button button-primary" href="#home">${escapeHtml(dict.startQuiz)}</a></div>`}
     </section>`
 }
 
-function reviewItem(item, index, answers, moduleName) {
+function reviewItem(rawItem, index, answers, moduleName) {
+  const dict = t()
+  const item = locQuestion(rawItem)
   const response = answers[item.id]
   const isCorrect = response === item.correct
   const isUnanswered = response === undefined
-  const statusText = isCorrect ? '正确' : isUnanswered ? '未答' : '答错'
+  const statusText = isCorrect ? dict.statusCorrect : isUnanswered ? dict.statusUnanswered : dict.statusWrong
   const statusClass = isCorrect ? 'correct' : isUnanswered ? 'unanswered' : 'wrong'
   return `
     <details class="review-item" ${allExpanded ? 'open' : ''}>
@@ -390,7 +488,7 @@ function reviewItem(item, index, answers, moduleName) {
         <span class="review-number">${String(index + 1).padStart(2, '0')}</span>
         <span class="review-module-tag">${escapeHtml(moduleName)}</span>
         <span class="review-topic">${escapeHtml(item.topic)}</span>
-        <span class="review-status ${statusClass}">${statusText}</span>
+        <span class="review-status ${statusClass}">${escapeHtml(statusText)}</span>
       </summary>
       <div class="review-body">
         <h3>${escapeHtml(item.prompt)}</h3>
@@ -399,7 +497,7 @@ function reviewItem(item, index, answers, moduleName) {
           const optCorrect = optionIndex === item.correct
           const optSelected = optionIndex === response
           const cls = optCorrect ? 'correct-option' : optSelected ? 'wrong-option' : ''
-          return `<li class="${cls}">${escapeHtml(option)}${optCorrect ? '<span class="tag tag-correct">正确答案</span>' : ''}${optSelected ? '<span class="tag tag-choice">你的选择</span>' : ''}</li>`
+          return `<li class="${cls}">${escapeHtml(option)}${optCorrect ? `<span class="tag tag-correct">${escapeHtml(dict.tagCorrect)}</span>` : ''}${optSelected ? `<span class="tag tag-choice">${escapeHtml(dict.tagChoice)}</span>` : ''}</li>`
         }).join('')}</ol>
         <p class="review-explanation">${escapeHtml(item.explanation)}</p>
         <a class="text-link" href="${escapeHtml(item.source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.source.label)} ↗</a>
@@ -408,7 +506,8 @@ function reviewItem(item, index, answers, moduleName) {
 }
 
 function reviewItems(report) {
-  const moduleNames = Object.fromEntries(report.results.map(m => [m.id, m.name]))
+  const dict = t()
+  const moduleNames = Object.fromEntries(report.results.map(m => [m.id, locModule(m).shortName]))
   const items = report.questions.map((item, index) => {
     if (reviewFilter !== 'all' && reviewFilter !== item.module)
       return ''
@@ -418,40 +517,42 @@ function reviewItems(report) {
   }).filter(Boolean)
   return items.length
     ? items.join('')
-    : '<div class="review-empty">没有符合条件的题目。</div>'
+    : `<div class="review-empty">${escapeHtml(dict.reviewEmpty)}</div>`
 }
 
 function results(report) {
+  const dict = t()
   const summary = summarizeReport(report)
   return `
     <section class="inner-page" aria-labelledby="report-title">
       <div class="page-top">
-        <a class="text-link" href="#history">← 历史报告</a>
+        <a class="text-link" href="#history">${escapeHtml(dict.backHistory)}</a>
       </div>
-      <h1 id="report-title" data-focus tabindex="-1">自测报告</h1>
-      <p class="page-intro">${dateFormat.format(new Date(report.submittedAt))}</p>
+      <h1 id="report-title" data-focus tabindex="-1">${escapeHtml(dict.reportTitle)}</h1>
+      <p class="page-intro">${dateFormats[lang].format(new Date(report.submittedAt))}</p>
       <dl class="summary-strip">
-        <div><dt>综合得分</dt><dd><strong>${summary.percent}%</strong></dd></div>
-        <div><dt>加权总分</dt><dd><strong>${summary.points}</strong><span>/ ${summary.max}</span></dd></div>
-        <div><dt>答对题数</dt><dd><strong>${summary.correctCount}</strong><span>/ ${summary.total}</span></dd></div>
+        <div><dt>${escapeHtml(dict.summaryPercent)}</dt><dd><strong>${summary.percent}%</strong></dd></div>
+        <div><dt>${escapeHtml(dict.summaryPoints)}</dt><dd><strong>${summary.points}</strong><span>/ ${summary.max}</span></dd></div>
+        <div><dt>${escapeHtml(dict.summaryCorrect)}</dt><dd><strong>${summary.correctCount}</strong><span>/ ${summary.total}</span></dd></div>
       </dl>
       <section class="results-section" aria-labelledby="modules-title">
         <div class="section-head">
-          <h2 id="modules-title">分模块得分</h2>
+          <h2 id="modules-title">${escapeHtml(dict.moduleScoresTitle)}</h2>
         </div>
         <div class="score-table-wrap">
           <table class="score-table">
             <thead>
               <tr>
-                <th>模块</th>
-                <th class="bar-cell" aria-label="得分比例"></th>
-                <th class="num">折算</th>
-                <th class="num">得分</th>
-                ${levels.map(level => `<th class="num">${escapeHtml(level.name.slice(0, 2))}</th>`).join('')}
+                <th>${escapeHtml(dict.colModule)}</th>
+                <th class="bar-cell" aria-label="${escapeHtml(dict.colBarAria)}"></th>
+                <th class="num">${escapeHtml(dict.colPercent)}</th>
+                <th class="num">${escapeHtml(dict.colPoints)}</th>
+                ${levels.map(level => `<th class="num">${escapeHtml(locLevel(level).short)}</th>`).join('')}
               </tr>
             </thead>
             <tbody>
-              ${report.results.map(module => {
+              ${report.results.map(rawModule => {
+                const module = locModule(rawModule)
                 const tone = module.percent >= 80 ? 'high' : module.percent < 50 ? 'low' : ''
                 return `<tr>
                   <td class="score-module">${escapeHtml(module.name)}</td>
@@ -467,17 +568,20 @@ function results(report) {
       </section>
       <section class="review-section" aria-labelledby="review-title">
         <div class="section-head">
-          <h2 id="review-title">逐题解析</h2>
+          <h2 id="review-title">${escapeHtml(dict.reviewTitle)}</h2>
           <div class="review-controls">
-            <select id="status-filter" aria-label="按作答状态筛选">
-              <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>全部题目</option>
-              <option value="missed" ${statusFilter === 'missed' ? 'selected' : ''}>仅看错题与未答</option>
+            <select id="status-filter" aria-label="${escapeHtml(dict.filterStatusAria)}">
+              <option value="all" ${statusFilter === 'all' ? 'selected' : ''}>${escapeHtml(dict.filterAll)}</option>
+              <option value="missed" ${statusFilter === 'missed' ? 'selected' : ''}>${escapeHtml(dict.filterMissed)}</option>
             </select>
-            <select id="review-filter" aria-label="按模块筛选">
-              <option value="all">全部模块</option>
-              ${report.results.map(module => `<option value="${module.id}" ${reviewFilter === module.id ? 'selected' : ''}>${escapeHtml(module.name)}</option>`).join('')}
+            <select id="review-filter" aria-label="${escapeHtml(dict.filterModuleAria)}">
+              <option value="all">${escapeHtml(dict.filterAllModules)}</option>
+              ${report.results.map(rawModule => {
+                const module = locModule(rawModule)
+                return `<option value="${module.id}" ${reviewFilter === module.id ? 'selected' : ''}>${escapeHtml(module.name)}</option>`
+              }).join('')}
             </select>
-            <button type="button" class="button button-ghost" data-action="toggle-all">${allExpanded ? '收起全部' : '展开全部'}</button>
+            <button type="button" class="button button-ghost" data-action="toggle-all">${escapeHtml(allExpanded ? dict.collapseAll : dict.expandAll)}</button>
           </div>
         </div>
         <div id="review-items" class="review-list">${reviewItems(report)}</div>
@@ -486,6 +590,7 @@ function results(report) {
 }
 
 function render(focus = false) {
+  const dict = t()
   const [route, report] = view()
   document.querySelectorAll('[data-nav]').forEach(link => {
     const selected = link.dataset.nav === (route === 'report' || route === 'history' ? 'history' : 'home')
@@ -493,9 +598,11 @@ function render(focus = false) {
       link.setAttribute('aria-current', 'page')
     else
       link.removeAttribute('aria-current')
+    if (link.dataset.nav === 'home')
+      link.textContent = dict.navHome
     if (link.dataset.nav === 'history') {
       const count = state.history.length
-      link.innerHTML = count ? `历史报告 <span class="nav-count">${count}</span>` : '历史报告'
+      link.innerHTML = count ? `${escapeHtml(dict.navHistory)} <span class="nav-count">${count}</span>` : escapeHtml(dict.navHistory)
     }
   })
   const contents = {
@@ -503,9 +610,10 @@ function render(focus = false) {
     quiz,
     history,
     report: () => results(report),
-    missing: () => '<section class="inner-page"><h1 data-focus tabindex="-1">找不到这份报告</h1><p style="margin-top:16px"><a class="button button-primary" href="#history">返回历史报告</a></p></section>',
+    missing: () => `<section class="inner-page"><h1 data-focus tabindex="-1">${escapeHtml(dict.missingTitle)}</h1><p style="margin-top:16px"><a class="button button-primary" href="#history">${escapeHtml(dict.returnHistory)}</a></p></section>`,
   }
-  main.innerHTML = `${storageError ? `<p class="storage-error" role="alert">${escapeHtml(storageError)}</p>` : ''}${contents[route]()}`
+  const errorText = storageErrorKey ? dict[storageErrorKey] : ''
+  main.innerHTML = `${errorText ? `<p class="storage-error" role="alert">${escapeHtml(errorText)}</p>` : ''}${contents[route]()}`
   if (focus)
     (main.querySelector('[data-focus]') || main).focus({ preventScroll: true })
 }
@@ -534,13 +642,14 @@ async function selectAnswer(choice) {
     const updated = view()[0] === 'quiz' && state.active.position === position
     const input = main.querySelector(`input[name="answer"][value="${choice}"]`)
     if (updated && input && !main.querySelector('.storage-error')) {
+      const dict = t()
       input.checked = true
       const count = Object.keys(state.active.answers).length
       main.querySelector('progress').value = count
-      main.querySelector('.progress-count').textContent = `已答 ${count} / ${questions.length}`
+      main.querySelector('.progress-count').textContent = dict.answeredProgress(count, questions.length)
       const number = main.querySelector(`.number-grid [data-position="${position}"]`)
       number.classList.add('answered')
-      number.setAttribute('aria-label', `第 ${position + 1} 题，已答`)
+      number.setAttribute('aria-label', dict.mapItemAria(position + 1, true))
     } else {
       render()
     }
@@ -574,22 +683,24 @@ main.addEventListener('click', async event => {
   }
 
   if (button.dataset.action === 'confirm' && state.active) {
+    const dict = t()
     const missing = questions.length - Object.keys(state.active.answers).length
     submissionId = state.active.id
     confirmation.returnValue = 'cancel'
     document.querySelector('#confirm-copy').textContent = missing
-      ? `还有 ${missing} 题未作答（按 0 分计），确认现在交卷吗？`
-      : `${questions.length} 题已全部作答，确认交卷？`
+      ? dict.confirmMissing(missing)
+      : dict.confirmAllDone(questions.length)
     confirmation.showModal()
     return
   }
 
   if (button.dataset.action === 'toggle-all') {
+    const dict = t()
     allExpanded = !allExpanded
     main.querySelectorAll('.review-item').forEach(el => {
       el.open = allExpanded
     })
-    button.textContent = allExpanded ? '收起全部' : '展开全部'
+    button.textContent = allExpanded ? dict.collapseAll : dict.expandAll
   }
 })
 
@@ -679,5 +790,6 @@ document.querySelector('.skip-link').addEventListener('click', event => {
   main.focus()
 })
 
+syncChrome()
 refreshState()
 render()

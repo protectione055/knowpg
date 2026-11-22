@@ -110,14 +110,17 @@ main { flex: 1; display: flex; flex-direction: column; }
 .site-header nav a[aria-current]::after { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; background: var(--accent); content: ""; }
 .nav-count { font: 600 11px/1 var(--mono); padding: 2px 6px; border-radius: 99px; background: var(--bg-subtle); color: var(--muted); }
 
-.theme-toggle {
+.header-controls { display: inline-flex; align-items: center; gap: 6px; }
+.icon-btn {
   display: inline-grid; place-items: center;
-  width: 32px; height: 32px; padding: 0;
+  min-width: 32px; height: 32px; padding: 0 8px;
   border: 1px solid var(--line); border-radius: 6px;
   background: var(--bg-elevated); color: var(--muted);
   transition: border-color .12s, color .12s, background .12s;
 }
-.theme-toggle:hover { border-color: var(--line-strong); color: var(--ink); background: var(--bg-hover); }
+.icon-btn:hover { border-color: var(--line-strong); color: var(--ink); background: var(--bg-hover); }
+.lang-toggle { font: 600 12px/1 var(--mono); letter-spacing: .01em; }
+.theme-toggle { padding: 0; width: 32px; }
 .theme-toggle .icon-sun { display: none; }
 :root[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
 :root[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
