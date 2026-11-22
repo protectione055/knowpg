@@ -1,6 +1,6 @@
 import { PG_VERSION, PAPER_VERSION, modules, levels, questions } from './questions.mjs'
 import { createAttempt, finishAttempt, readState, storageKey } from './assessment.mjs'
-import { drawHero } from './hero.mjs'
+import { drawElephant } from './hero.mjs'
 
 const main = document.querySelector('main')
 const confirmation = document.querySelector('#confirmation')
@@ -80,7 +80,22 @@ function home() {
         <p class="hero-summary">从理解核心概念，到推演运行机制，再到读懂源码。<br class="desktop-break">完成一套自测，看看你对各个模块掌握到了哪一层。</p>
         <div class="hero-actions"><button class="button button-primary" data-action="start">${state.active ? '继续作答' : '开始自测'} <span aria-hidden="true">→</span></button>${resume}</div>
       </div>
-      <div class="hero-visual" aria-hidden="true"><canvas id="hero-art"></canvas></div>
+      <div class="hero-visual">
+        <canvas id="hero-elephant" width="32" height="24" aria-hidden="true"></canvas>
+        <figure class="terminal">
+          <figcaption class="terminal-bar">
+            <span class="terminal-controls" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span>psql <span class="terminal-divider">/</span> EXPLAIN 示例</span>
+          </figcaption>
+          <pre><code><span class="terminal-prompt">postgres=#</span> <b>EXPLAIN</b> (COSTS OFF)
+<span class="terminal-prompt">postgres-#</span> <b>SELECT</b> relname <b>FROM</b> <span class="terminal-identifier">pg_class</span>
+<span class="terminal-prompt">postgres-#</span> <b>WHERE</b> oid = <span class="terminal-literal">1259</span>;
+
+<span class="terminal-plan">QUERY PLAN</span>
+<span class="terminal-node">Index Scan</span> using pg_class_oid_index on pg_class
+  Index Cond: (oid = '1259'::oid)</code></pre>
+        </figure>
+      </div>
     </section>
     <dl class="facts">
       <div><dt>覆盖模块</dt><dd><strong>6</strong><span>个</span></dd></div>
@@ -226,9 +241,9 @@ function render(focus = false) {
     missing: () => '<section class="inner-page"><h1 data-focus tabindex="-1">找不到这份报告</h1><p class="page-intro">历史报告存放在作答时使用的浏览器中。</p><a class="button button-primary" href="#history">查看历史报告 →</a></section>',
   }
   main.innerHTML = `${storageError ? `<p class="storage-error" role="alert">${escapeHtml(storageError)}</p>` : ''}${contents[route]()}`
-  const canvas = document.querySelector('#hero-art')
+  const canvas = document.querySelector('#hero-elephant')
   if (canvas)
-    drawHero(canvas)
+    drawElephant(canvas)
   if (focus)
     (main.querySelector('[data-focus]') || main).focus({ preventScroll: true })
 }
@@ -330,11 +345,6 @@ window.addEventListener('storage', event => {
     refreshState()
     render()
   }
-})
-window.addEventListener('resize', () => {
-  const canvas = document.querySelector('#hero-art')
-  if (canvas)
-    drawHero(canvas)
 })
 document.querySelector('.skip-link').addEventListener('click', event => {
   event.preventDefault()
