@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#faf8f5">
   <meta name="description" content="PostgreSQL 18.6 内核熟悉度自测：36 道单选题，覆盖查询规划、执行器、堆表与缓冲、索引、事务并发和 WAL 恢复。">
-  <title>How Well Do You Know PostgreSQL?</title>
+  <title>KnowPG — How Well Do You Know PostgreSQL?</title>
   <script>
     (() => {
       try {
-        const saved = localStorage.getItem('pg-kernel-assessment.theme')
+        const saved = localStorage.getItem('knowpg.theme')
         const dark = saved === 'dark' || (saved !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-        const lang = localStorage.getItem('pg-kernel-assessment.lang')
+        const lang = localStorage.getItem('knowpg.lang')
         if (lang === 'en') document.documentElement.lang = 'en'
       } catch {}
     })()
@@ -33,7 +33,7 @@
             <circle cx="11.2" cy="8.5" r="0.9" fill="currentColor" stroke="none"/>
           </svg>
         </span>
-        <span class="brand-name">PG Internals</span>
+        <span class="brand-name">KnowPG</span>
       </a>
       <div class="header-right">
         <nav aria-label="主导航">

@@ -1,10 +1,12 @@
-# How Well Do You Know PostgreSQL?
+# KnowPG
+
+How Well Do You Know PostgreSQL?
 
 基于 PostgreSQL 18.6 的浏览器端内核自测卷，包含 36 道单选题，覆盖查询规划、查询执行、堆表与缓冲管理、索引、事务与并发、WAL 与恢复六个模块。交卷后按模块汇总加权得分，并提供源码行号与官方文档出处。
 
 ## 本地运行
 
-在 `pg-kernel-assessment` 目录下启动静态服务：
+在项目目录下启动静态服务：
 
 ```sh
 python3 -m http.server 8765 --bind 127.0.0.1

@@ -6,8 +6,8 @@ const main = document.querySelector('main')
 const confirmation = document.querySelector('#confirmation')
 const themeToggle = document.querySelector('#theme-toggle')
 const langToggle = document.querySelector('#lang-toggle')
-const themeStorageKey = 'pg-kernel-assessment.theme'
-const langStorageKey = 'pg-kernel-assessment.lang'
+const themeStorageKey = 'knowpg.theme'
+const langStorageKey = 'knowpg.lang'
 const letters = ['A', 'B', 'C', 'D']
 
 const dateFormats = {

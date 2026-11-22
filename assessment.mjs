@@ -1,6 +1,6 @@
 import { questions, modules, levels, PAPER_VERSION } from './questions.mjs'
 
-export const storageKey = 'pg-kernel-assessment.v1'
+export const storageKey = 'knowpg.v1'
 
 export function createAttempt() {
   return {

@@ -1,6 +1,6 @@
 export const ui = {
   zh: {
-    docTitle: 'How Well Do You Know PostgreSQL?',
+    docTitle: 'KnowPG — How Well Do You Know PostgreSQL?',
     skipLink: '跳转到主要内容',
     navHome: '首页',
     navHistory: '历史报告',
@@ -69,7 +69,7 @@ export const ui = {
     tagChoice: '你的选择',
   },
   en: {
-    docTitle: 'How Well Do You Know PostgreSQL?',
+    docTitle: 'KnowPG — How Well Do You Know PostgreSQL?',
     skipLink: 'Skip to main content',
     navHome: 'Home',
     navHistory: 'History',
