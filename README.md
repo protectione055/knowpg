@@ -1,19 +1,23 @@
-# PostgreSQL 内核熟悉度自测
+# How Well Do You Know PostgreSQL?
 
-基于上游 PostgreSQL 18.6 的浏览器端个人自测。固定卷包含 36 道四选一题，覆盖六个内核模块。交卷后可查看各模块的加权分数、分层答对题数和带来源的题目解析。
+基于 PostgreSQL 18.6 的浏览器端内核自测卷，包含 36 道单选题，覆盖查询规划、查询执行、堆表与缓冲管理、索引、事务与并发、WAL 与恢复六个模块。交卷后按模块汇总加权得分，并提供源码行号与官方文档出处。
 
-## 启动
+## 本地运行
 
-在 `pg-kernel-assessment` 目录运行：
+在 `pg-kernel-assessment` 目录下启动静态服务：
 
 ```sh
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-打开 [http://127.0.0.1:8765/](http://127.0.0.1:8765/)。进度和报告按站点地址保存到浏览器，后续访问使用同一个地址和端口。
+访问 [http://127.0.0.1:8765/](http://127.0.0.1:8765/)。答题进度与历史报告仅保存在当前浏览器的 `localStorage` 中（按 origin 隔离），不上传服务器。
 
-## 验证与题库
+## 测试与题库说明
 
-使用 Node.js 20 或更高版本运行 `node --test assessment.test.mjs`。
+使用 Node.js 20+ 运行单元测试：
 
-题库位于 `questions.mjs`。源码引用固定到 `REL_18_6` 对应的提交 `724edf9bde9d356724ad384a2e196edc3c9f80f7`。发布实质性的题卷更新时，更新题卷版本。已提交报告随记录保存其题目、答案和评分。
+```sh
+node --test assessment.test.mjs
+```
+
+题库位于 `questions.mjs`，源码引用固定在 `REL_18_6` 对应提交 `724edf9bde9d356724ad384a2e196edc3c9f80f7`。已提交的历史报告会连同当时的题目、作答和评分一起快照保存。
