@@ -1,25 +1,41 @@
 # KnowPG
 
-How Well Do You Know PostgreSQL?
+**How Well Do You Know PostgreSQL?**
 
-基于 PostgreSQL 18.6 的浏览器端内核自测卷，包含 36 道单选题，覆盖查询规划、查询执行、堆表与缓冲管理、索引、事务与并发、WAL 与恢复六个模块。交卷后按模块汇总加权得分，并提供源码行号与官方文档出处。
+English | [中文](./README.zh-CN.md)
 
-## 本地运行
+KnowPG is a self-assessment website for checking how well you really understand PostgreSQL under the hood.
 
-在项目目录下启动静态服务：
+- **Test your core knowledge**: Covers six core areas — Query Planning, Query Execution, Storage & Buffers, Indexing, Transactions & Concurrency, and WAL & Recovery.
+- **Find your blind spots**: Get a breakdown of your score by topic after finishing, along with explanations for every question.
+- **Learn at your own pace**: Switch between English and Chinese, toggle light/dark themes, and revisit past attempts anytime.
+
+## Deployment
+
+KnowPG is a static website with no build step or backend required. Because it uses ES Modules, serve it over HTTP rather than opening `index.html` directly via `file://`.
+
+### Local Preview
+
+Run any static file server in the project root:
 
 ```sh
 python3 -m http.server 8765 --bind 127.0.0.1
 ```
 
-访问 [http://127.0.0.1:8765/](http://127.0.0.1:8765/)。答题进度与历史报告仅保存在当前浏览器的 `localStorage` 中（按 origin 隔离），不上传服务器。
+Then open <http://127.0.0.1:8765/>.
 
-## 测试与题库说明
+### Hosting
 
-使用 Node.js 20+ 运行单元测试：
+Deploy the repository root directly to any static host:
+
+- **GitHub Pages**: Go to `Settings → Pages` and deploy from the root (`/`) of your branch.
+- **Cloudflare Pages / Vercel / Netlify**: Connect the repository, leave the build command empty, and set the publish/output directory to `.`.
+- **Nginx / Caddy**: Point the document root to this directory and ensure `.mjs` files are served with `text/javascript` or `application/javascript`.
+
+## Tests
+
+Verify the question bank and bilingual coverage (requires Node.js 20+):
 
 ```sh
 node --test assessment.test.mjs
 ```
-
-题库位于 `questions.mjs`，源码引用固定在 `REL_18_6` 对应提交 `724edf9bde9d356724ad384a2e196edc3c9f80f7`。已提交的历史报告会连同当时的题目、作答和评分一起快照保存。
